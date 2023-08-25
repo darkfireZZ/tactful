@@ -162,6 +162,36 @@ struct PhoneNumber {
     ty: PhoneNumberType,
 }
 
+impl PhoneNumber {
+    /// Checks if this phone number is valid.
+    ///
+    /// This is very rudimentary and does not check a great many things.
+    fn validate(&self) -> anyhow::Result<()> {
+        let chars = self
+            .number
+            .chars()
+            .filter(|c| c.is_whitespace())
+            .collect::<Vec<_>>();
+
+        match chars.first() {
+            Some(&first_char) => {
+                if !(first_char.is_ascii_digit() || first_char == '+') {
+                    bail!("Phone number must begin with a digit or a '+'");
+                }
+            }
+            None => {
+                bail!("Phone number cannot be empty");
+            }
+        }
+
+        if !chars.iter().skip(1).all(char::is_ascii_digit) {
+            bail!("All except the first character of a phone number must be digits");
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PhoneNumberType {
     Mobile,

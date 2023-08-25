@@ -159,8 +159,9 @@ impl TryFrom<JsonContact> for Contact {
             phone_numbers: json_contact
                 .phone
                 .into_iter()
-                .map(PhoneNumber::from)
-                .collect(),
+                .map(PhoneNumber::try_from)
+                .collect::<Result<Vec<_>, _>>()
+                .with_context(error_message)?,
             email_addresses: json_contact.email,
             address: json_contact
                 .address
@@ -180,12 +181,19 @@ impl From<&JsonName> for Name {
     }
 }
 
-impl From<JsonPhoneNumber> for PhoneNumber {
-    fn from(json_phone_number: JsonPhoneNumber) -> Self {
-        PhoneNumber {
+impl TryFrom<JsonPhoneNumber> for PhoneNumber {
+    type Error = anyhow::Error;
+    fn try_from(json_phone_number: JsonPhoneNumber) -> anyhow::Result<Self> {
+        let phone_number = PhoneNumber {
             number: json_phone_number.number,
             ty: PhoneNumberType::from(json_phone_number.ty),
-        }
+        };
+
+        phone_number
+            .validate()
+            .context("Failed to parse phone number")?;
+
+        Ok(phone_number)
     }
 }
 
