@@ -1,7 +1,7 @@
 use {
-    crate::Contact,
+    crate::{Contact, PhoneNumberType},
     anyhow::Context,
-    ical_vcard::{Contentline, Identifier, Param, Value},
+    ical_vcard::{Contentline, Identifier, Param, ParamValue, Value},
     std::{io::Write, iter::IntoIterator},
 };
 
@@ -47,6 +47,40 @@ fn contact_to_contentlines(contact: &Contact) -> anyhow::Result<Vec<Contentline<
         },
     ];
 
+    for phone_number in &contact.phone_numbers {
+        let param_value = match phone_number.ty {
+            PhoneNumberType::Mobile => "cell",
+            PhoneNumberType::Home => "home",
+            PhoneNumberType::Work => "work",
+        };
+        let formatted_number = phone_number
+            .number
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect::<String>();
+
+        contentlines.push(Contentline {
+            group: None,
+            name: Identifier::new("TEL").expect("valid identifier"),
+            params: vec![
+                Param::new(
+                    Identifier::new("VALUE").expect("valid identifier"),
+                    vec![ParamValue::new("uri").expect("valid parameter value")],
+                )
+                .expect("valid parameter"),
+                Param::new(
+                    Identifier::new("TYPE").expect("valid identifier"),
+                    vec![ParamValue::new(param_value).expect("valid parameter value")],
+                )
+                .expect("valid parameter"),
+            ],
+            value: Value::new(format!("tel:{formatted_number}")).expect("valid value"),
+        })
+    }
+
+    // TODO implement email addresses
+    // TODO implement physical address
+
     if let Some(birthday) = &contact.birthday {
         contentlines.push(Contentline {
             group: None,
@@ -60,10 +94,6 @@ fn contact_to_contentlines(contact: &Contact) -> anyhow::Result<Vec<Contentline<
             .expect("valid value"),
         })
     }
-
-    // TODO implement phone numbers
-    // TODO implement email addresses
-    // TODO implement physical address
 
     contentlines.push(Contentline {
         group: None,

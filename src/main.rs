@@ -13,7 +13,7 @@ fn main() -> anyhow::Result<()> {
     let json_file = File::open(json_path)?;
     let contacts = json::contacts_from_json(BufReader::new(json_file))?;
 
-    let vcf_path = ".test.vcf";
+    let vcf_path = "./test.vcf";
     let vcf_file = File::create(vcf_path)?;
     let writer = BufWriter::new(vcf_file);
     vcard::contacts_to_vcard(writer, &contacts)
