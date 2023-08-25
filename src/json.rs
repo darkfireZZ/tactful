@@ -1,43 +1,48 @@
 //! JSON representation of the contacts
-// TODO expand documentation and add example
+//!
+//! This module contains the code that serializes contacts to and deserializes them from a JSON
+//! representation.
 
 use {
+    anyhow::Context,
     crate::{Address, Contact, Date, Name, PhoneNumber, PhoneNumberType},
     serde::{Deserialize, Serialize},
-    std::io::Write,
+    std::io::{BufReader, Read, Write},
 };
 
 // ========================================================================== //
 // =====> structs to encode the structure of the JSON objects <============== //
 // ========================================================================== //
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct JsonContact {
     name: JsonName,
     #[serde(skip_serializing_if = "Option::is_none")]
     bday: Option<String>,
+    #[serde(default)] 
     #[serde(skip_serializing_if = "Vec::is_empty")]
     phone: Vec<JsonPhoneNumber>,
+    #[serde(default)] 
     #[serde(skip_serializing_if = "Vec::is_empty")]
     email: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     address: Option<JsonAddress>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct JsonName {
     first: String,
     last: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct JsonPhoneNumber {
     number: String,
     #[serde(rename = "type")]
     ty: JsonPhoneNumberType,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum JsonPhoneNumberType {
     Mobile,
@@ -45,7 +50,7 @@ enum JsonPhoneNumberType {
     Home,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct JsonAddress {
     street: String,
     number: String,
@@ -55,12 +60,11 @@ struct JsonAddress {
 }
 
 // ========================================================================== //
-// =====> conversion: contacts -> JSON <===================================== //
+// =====> serialization <==================================================== //
 // ========================================================================== //
 
-
 pub fn contacts_to_json<W: Write>(writer: W, contacts: &[Contact]) -> anyhow::Result<()> {
-    Ok(serde_json::to_writer_pretty(writer, &contacts.into_iter().map(JsonContact::from).collect::<Vec<_>>())?)
+    Ok(serde_json::to_writer_pretty(writer, &contacts.iter().map(JsonContact::from).collect::<Vec<_>>())?)
 }
 
 impl From<&Contact> for JsonContact {
@@ -112,5 +116,70 @@ impl From<&Address> for JsonAddress {
             postal_code: address.postal_code.to_owned(),
             country: address.country.alpha2.to_owned(),
         }
+    }
+}
+
+// ========================================================================== //
+// =====> deserialization <================================================== //
+// ========================================================================== //
+
+pub fn contacts_from_json<R: Read>(reader: R) -> anyhow::Result<Vec<Contact>> {
+    let json_contacts: Vec<JsonContact> = serde_json::from_reader(BufReader::new(reader))?;
+    json_contacts.into_iter().map(Contact::try_from).collect::<anyhow::Result<Vec<_>>>().context("Failed to parse JSON contacts")
+}
+
+impl TryFrom<JsonContact> for Contact {
+    type Error = anyhow::Error;
+    fn try_from(json_contact: JsonContact) -> anyhow::Result<Self> {
+        let error_message = || format!("Failed to parse contact \"{} {}\"", &json_contact.name.first, &json_contact.name.last);
+
+        Ok(Contact {
+            name: Name::from(&json_contact.name),
+            birthday: json_contact.bday.map(|date| Date::from_json_string_repr(&date)).transpose().with_context(error_message)?,
+            phone_numbers: json_contact.phone.into_iter().map(PhoneNumber::from).collect(),
+            email_addresses: json_contact.email,
+            address: json_contact.address.map(Address::try_from).transpose().with_context(error_message)?,
+        })
+    }
+}
+
+impl From<&JsonName> for Name {
+    fn from(json_name: &JsonName) -> Self {
+        Name {
+            first: json_name.first.to_owned(),
+            last: json_name.last.to_owned(),
+        }
+    }
+}
+
+impl From<JsonPhoneNumber> for PhoneNumber {
+    fn from(json_phone_number: JsonPhoneNumber) -> Self {
+        PhoneNumber {
+            number: json_phone_number.number,
+            ty: PhoneNumberType::from(json_phone_number.ty),
+        }
+    }
+}
+
+impl From<JsonPhoneNumberType> for PhoneNumberType {
+    fn from(json_phone_number_type: JsonPhoneNumberType) -> Self {
+        match json_phone_number_type {
+            JsonPhoneNumberType::Mobile => PhoneNumberType::Mobile,
+            JsonPhoneNumberType::Work => PhoneNumberType::Work,
+            JsonPhoneNumberType::Home => PhoneNumberType::Home,
+        }
+    }
+}
+
+impl TryFrom<JsonAddress> for Address {
+    type Error = anyhow::Error;
+    fn try_from(json_address: JsonAddress) -> anyhow::Result<Self> {
+        Ok(Address {
+            street: json_address.street,
+            number: json_address.number,
+            locality: json_address.locality,
+            postal_code: json_address.postal_code,
+            country: country_codes::from_alpha2(&json_address.country).context("Failed to parse address")?,
+        })
     }
 }

@@ -1,11 +1,22 @@
 use {
     anyhow::{bail, Context},
-    std::{fs::File, io::BufWriter, str::FromStr},
+    std::{fs::File, io::BufReader, str::FromStr},
     country_codes::CountryCode,
 };
 
+fn main() -> anyhow::Result<()> {
+    let path = "./contacts.json";
+    let file = File::open(path)?;
+    let contacts = json::contacts_from_json(BufReader::new(file))?;
+
+    dbg!(contacts);
+
+    Ok(())
+}
+
 mod json;
 
+#[derive(Debug)]
 pub struct Contact {
     name: Name,
     birthday: Option<Date>,
@@ -14,11 +25,13 @@ pub struct Contact {
     address: Option<Address>,
 }
 
+#[derive(Debug)]
 struct Name {
     first: String,
     last: String,
 }
 
+#[derive(Debug)]
 struct Date {
     year: Option<u16>,
     month: Option<u16>,
@@ -68,18 +81,20 @@ impl Date {
     }
 }
 
+#[derive(Debug)]
 struct PhoneNumber {
     number: String,
     ty: PhoneNumberType,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PhoneNumberType {
     Mobile,
     Home,
     Work
 }
 
+#[derive(Debug)]
 struct Address {
     street: String,
     number: String,
