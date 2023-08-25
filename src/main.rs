@@ -16,7 +16,7 @@ fn main() -> anyhow::Result<()> {
     let vcf_path = ".test.vcf";
     let vcf_file = File::create(vcf_path)?;
     let writer = BufWriter::new(vcf_file);
-    Ok(vcard::contacts_to_vcard(writer, &contacts)?)
+    vcard::contacts_to_vcard(writer, &contacts)
 }
 
 mod json;
@@ -45,6 +45,47 @@ struct Date {
 }
 
 impl Date {
+    fn is_leap_year(year: u16) -> bool {
+        ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0)
+    }
+
+    fn max_days_in_month(month: Option<u16>, year: Option<u16>) -> u16 {
+        match month {
+            None => 31,
+            Some(month) => match month {
+                1 => 31,
+                2 => year.map_or(29, |year| if Self::is_leap_year(year) { 29 } else { 28 }),
+                3 => 31,
+                4 => 30,
+                5 => 31,
+                6 => 30,
+                7 => 31,
+                8 => 31,
+                9 => 30,
+                10 => 31,
+                11 => 30,
+                12 => 31,
+                _ => unreachable!("this function expects to receive a valid month"),
+            },
+        }
+    }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        if let Some(month) = self.month {
+            if month == 0 || month > 12 {
+                bail!("Invalid month: {}", month)
+            }
+        }
+
+        if let Some(day) = self.day {
+            if day == 0 || day > Self::max_days_in_month(self.month, self.year) {
+                bail!("Invalid day: {}", day)
+            }
+        }
+
+        Ok(())
+    }
+
     fn to_json_string_repr(&self) -> String {
         let year = match self.year {
             Some(year) => year.to_string(),
@@ -82,11 +123,16 @@ impl Date {
             bail!(error_message());
         }
 
-        Ok(Self {
+        let date = Self {
             year: Self::parse_json_component(components[0]).with_context(error_message)?,
             month: Self::parse_json_component(components[1]).with_context(error_message)?,
             day: Self::parse_json_component(components[2]).with_context(error_message)?,
-        })
+        };
+
+        date.validate()
+            .with_context(|| format!("Invalid date \"{string_repr}\""))?;
+
+        Ok(date)
     }
 
     fn to_vcard_string_repr(&self) -> anyhow::Result<String> {
