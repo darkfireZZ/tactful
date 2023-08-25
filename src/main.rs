@@ -1,7 +1,7 @@
 use {
     anyhow::{bail, Context},
-    std::{fs::File, io::BufReader, str::FromStr},
     country_codes::CountryCode,
+    std::{fs::File, io::BufReader, str::FromStr},
 };
 
 fn main() -> anyhow::Result<()> {
@@ -60,7 +60,10 @@ impl Date {
         Ok(if component.is_empty() {
             None
         } else {
-            Some(u16::from_str(component).with_context(|| format!("Invalid component: \"{component}\""))?)
+            Some(
+                u16::from_str(component)
+                    .with_context(|| format!("Invalid component: \"{component}\""))?,
+            )
         })
     }
 
@@ -72,7 +75,7 @@ impl Date {
         if components.len() != 3 {
             bail!(error_message());
         }
-        
+
         Ok(Self {
             year: Self::parse_json_component(components[0]).with_context(error_message)?,
             month: Self::parse_json_component(components[1]).with_context(error_message)?,
@@ -91,7 +94,7 @@ struct PhoneNumber {
 enum PhoneNumberType {
     Mobile,
     Home,
-    Work
+    Work,
 }
 
 #[derive(Debug)]

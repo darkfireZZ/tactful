@@ -4,8 +4,8 @@
 //! representation.
 
 use {
-    anyhow::Context,
     crate::{Address, Contact, Date, Name, PhoneNumber, PhoneNumberType},
+    anyhow::Context,
     serde::{Deserialize, Serialize},
     std::io::{BufReader, Read, Write},
 };
@@ -19,10 +19,10 @@ struct JsonContact {
     name: JsonName,
     #[serde(skip_serializing_if = "Option::is_none")]
     bday: Option<String>,
-    #[serde(default)] 
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     phone: Vec<JsonPhoneNumber>,
-    #[serde(default)] 
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     email: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -64,7 +64,10 @@ struct JsonAddress {
 // ========================================================================== //
 
 pub fn contacts_to_json<W: Write>(writer: W, contacts: &[Contact]) -> anyhow::Result<()> {
-    Ok(serde_json::to_writer_pretty(writer, &contacts.iter().map(JsonContact::from).collect::<Vec<_>>())?)
+    Ok(serde_json::to_writer_pretty(
+        writer,
+        &contacts.iter().map(JsonContact::from).collect::<Vec<_>>(),
+    )?)
 }
 
 impl From<&Contact> for JsonContact {
@@ -72,7 +75,11 @@ impl From<&Contact> for JsonContact {
         Self {
             name: JsonName::from(&contact.name),
             bday: contact.birthday.as_ref().map(Date::to_json_string_repr),
-            phone: contact.phone_numbers.iter().map(JsonPhoneNumber::from).collect(),
+            phone: contact
+                .phone_numbers
+                .iter()
+                .map(JsonPhoneNumber::from)
+                .collect(),
             email: contact.email_addresses.clone(),
             address: contact.address.as_ref().map(JsonAddress::from),
         }
@@ -125,20 +132,41 @@ impl From<&Address> for JsonAddress {
 
 pub fn contacts_from_json<R: Read>(reader: R) -> anyhow::Result<Vec<Contact>> {
     let json_contacts: Vec<JsonContact> = serde_json::from_reader(BufReader::new(reader))?;
-    json_contacts.into_iter().map(Contact::try_from).collect::<anyhow::Result<Vec<_>>>().context("Failed to parse JSON contacts")
+    json_contacts
+        .into_iter()
+        .map(Contact::try_from)
+        .collect::<anyhow::Result<Vec<_>>>()
+        .context("Failed to parse JSON contacts")
 }
 
 impl TryFrom<JsonContact> for Contact {
     type Error = anyhow::Error;
     fn try_from(json_contact: JsonContact) -> anyhow::Result<Self> {
-        let error_message = || format!("Failed to parse contact \"{} {}\"", &json_contact.name.first, &json_contact.name.last);
+        let error_message = || {
+            format!(
+                "Failed to parse contact \"{} {}\"",
+                &json_contact.name.first, &json_contact.name.last
+            )
+        };
 
         Ok(Contact {
             name: Name::from(&json_contact.name),
-            birthday: json_contact.bday.map(|date| Date::from_json_string_repr(&date)).transpose().with_context(error_message)?,
-            phone_numbers: json_contact.phone.into_iter().map(PhoneNumber::from).collect(),
+            birthday: json_contact
+                .bday
+                .map(|date| Date::from_json_string_repr(&date))
+                .transpose()
+                .with_context(error_message)?,
+            phone_numbers: json_contact
+                .phone
+                .into_iter()
+                .map(PhoneNumber::from)
+                .collect(),
             email_addresses: json_contact.email,
-            address: json_contact.address.map(Address::try_from).transpose().with_context(error_message)?,
+            address: json_contact
+                .address
+                .map(Address::try_from)
+                .transpose()
+                .with_context(error_message)?,
         })
     }
 }
@@ -179,7 +207,8 @@ impl TryFrom<JsonAddress> for Address {
             number: json_address.number,
             locality: json_address.locality,
             postal_code: json_address.postal_code,
-            country: country_codes::from_alpha2(&json_address.country).context("Failed to parse address")?,
+            country: country_codes::from_alpha2(&json_address.country)
+                .context("Failed to parse address")?,
         })
     }
 }
