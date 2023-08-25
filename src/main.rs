@@ -179,7 +179,7 @@ impl PhoneNumber {
         let chars = self
             .number
             .chars()
-            .filter(|c| c.is_whitespace())
+            .filter(|c| !c.is_whitespace())
             .collect::<Vec<_>>();
 
         match chars.first() {
