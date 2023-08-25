@@ -37,6 +37,10 @@ struct Name {
     last: String,
 }
 
+/// Represents a date.
+///
+/// All functions and structs that take [`Date`]s assume that the date is valid. All functions that
+/// produce [`Date`]s only produce valid dates. Use [`Date::validate`] to validate dates.
 #[derive(Debug)]
 struct Date {
     year: Option<u16>,
@@ -156,6 +160,11 @@ impl Date {
     }
 }
 
+/// Represents a telephone number.
+///
+/// All functions and structs that take [`PhoneNumber`]s assume that the phone number is valid. All
+/// functions that produce [`PhoneNumber`]s only produce valid phone numbers. Use
+/// [`PhoneNumber::validate`] to validate phone numbers.
 #[derive(Debug)]
 struct PhoneNumber {
     number: String,
