@@ -128,6 +128,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "443144c8cdadd93ebf52ddb4056d257f5b52c04d3c804e657d19eb73fc33668b"
 
 [[package]]
+name = "ical_vcard"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e26daff2ede6762acf3194cc8917f170152b3b7f127dd168fbab2d4cdb31f61"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "is-terminal"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -388,6 +397,7 @@ name = "tactful"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ical_vcard",
  "rust_iso3166",
  "serde",
  "serde_json",

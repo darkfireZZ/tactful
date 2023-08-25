@@ -1,20 +1,26 @@
 use {
     anyhow::{bail, Context},
     country_codes::CountryCode,
-    std::{fs::File, io::BufReader, str::FromStr},
+    std::{
+        fs::File,
+        io::{BufReader, BufWriter},
+        str::FromStr,
+    },
 };
 
 fn main() -> anyhow::Result<()> {
-    let path = "./contacts.json";
-    let file = File::open(path)?;
-    let contacts = json::contacts_from_json(BufReader::new(file))?;
+    let json_path = "./contacts.json";
+    let json_file = File::open(json_path)?;
+    let contacts = json::contacts_from_json(BufReader::new(json_file))?;
 
-    dbg!(contacts);
-
-    Ok(())
+    let vcf_path = ".test.vcf";
+    let vcf_file = File::create(vcf_path)?;
+    let writer = BufWriter::new(vcf_file);
+    Ok(vcard::contacts_to_vcard(writer, &contacts)?)
 }
 
 mod json;
+mod vcard;
 
 #[derive(Debug)]
 pub struct Contact {
@@ -80,6 +86,26 @@ impl Date {
             year: Self::parse_json_component(components[0]).with_context(error_message)?,
             month: Self::parse_json_component(components[1]).with_context(error_message)?,
             day: Self::parse_json_component(components[2]).with_context(error_message)?,
+        })
+    }
+
+    fn to_vcard_string_repr(&self) -> anyhow::Result<String> {
+        if let Some(year) = self.year {
+            if year > 9999 {
+                bail!("Years greater than 9999 cannot be represented in vCard version 4.0");
+            }
+        }
+
+        Ok(match (self.year, self.month, self.day) {
+            (None, None, Some(day)) => format!("---{day:02}"),
+            (None, Some(month), None) => format!("--{month:02}"),
+            (None, Some(month), Some(day)) => format!("--{month:02}{day:02}"),
+            (Some(year), None, None) => format!("{year:04}"),
+            (Some(year), Some(month), None) => format!("{year:04}-{month:02}"),
+            (Some(year), Some(month), Some(day)) => format!("{year:04}{month:02}{day:02}"),
+            (None, None, None) | (Some(_), None, Some(_)) => {
+                bail!("Date cannot be represented in vCard version 4.0")
+            }
         })
     }
 }
