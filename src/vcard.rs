@@ -42,6 +42,14 @@ fn contact_to_contentlines(contact: &Contact) -> anyhow::Result<Vec<Contentline<
         },
         Contentline {
             group: None,
+            name: Identifier::new("FN").expect("valid identifier"),
+            params: Vec::new(),
+            value: Value::new(format!("{} {}", &contact.name.first, &contact.name.last)).context(
+                "Failed to write name to contentline because it contains control characters",
+            )?,
+        },
+        Contentline {
+            group: None,
             name: Identifier::new("N").expect("valid identifier"),
             params: Vec::new(),
             value: Value::new(format!("{};{};;;", &contact.name.last, &contact.name.first))
