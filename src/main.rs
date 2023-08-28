@@ -1,10 +1,11 @@
 use {
     anyhow::{bail, Context},
+    chrono::Datelike,
     clap::{Parser, Subcommand},
     country_codes::CountryCode,
     std::{
         fs::File,
-        io::{self, BufReader, BufWriter},
+        io::{self, BufReader, BufWriter, Write},
         str::FromStr,
     },
 };
@@ -14,11 +15,7 @@ fn main() -> anyhow::Result<()> {
 
     match args.command {
         Command::Export { format } => {
-            // TODO make contacts_path customizable
-            let json_path = "./contacts.json";
-            let json_file = File::open(json_path)?;
-            let contacts = json::contacts_from_json(BufReader::new(json_file))?;
-
+            let contacts = obtain_contacts()?;
             let writer = BufWriter::new(io::stdout());
 
             match format {
@@ -26,7 +23,71 @@ fn main() -> anyhow::Result<()> {
                 OutputFormat::Vcard => vcard::contacts_to_vcard(writer, &contacts),
             }
         }
+        Command::Bdays => {
+            let contacts = obtain_contacts()?;
+            let today = Date::today();
+            let mut bday_items = contacts
+                .into_iter()
+                .filter_map(|contact| {
+                    let bday = contact.birthday.as_ref()?;
+                    // Note that if bday is on the 29th February, `next_bday` may NOT represent a valid
+                    // date. However, it should still be displayed. I don't want to miss any birthdays
+                    // after all.
+                    let next_bday = match (bday.month, bday.day) {
+                        (Some(month), Some(day)) => {
+                            let bday_this_year = Date {
+                                year: today.year,
+                                month,
+                                day,
+                            };
+
+                            if bday_this_year >= today {
+                                bday_this_year
+                            } else {
+                                Date {
+                                    year: today.year + 1,
+                                    month,
+                                    day,
+                                }
+                            }
+                        }
+                        _ => return None,
+                    };
+
+                    Some(BdayItem { next_bday, contact })
+                })
+                .collect::<Vec<_>>();
+            bday_items.sort_unstable_by_key(|item| item.next_bday);
+
+            let mut writer = BufWriter::new(io::stdout());
+            for item in bday_items {
+                writeln!(
+                    &mut writer,
+                    "{year:04}-{month:02}-{day:02} {first_name} {last_name}",
+                    year = item.next_bday.year,
+                    month = item.next_bday.month,
+                    day = item.next_bday.day,
+                    first_name = item.contact.name.first,
+                    last_name = item.contact.name.last,
+                )?;
+            }
+
+            Ok(())
+        }
     }
+}
+
+fn obtain_contacts() -> anyhow::Result<Vec<Contact>> {
+    // TODO make contacts_path customizable
+    let contacts_path = "./contacts.json";
+    let contacts_file = File::open(contacts_path)?;
+    json::contacts_from_json(BufReader::new(contacts_file))
+}
+
+#[derive(Debug)]
+struct BdayItem {
+    next_bday: Date,
+    contact: Contact,
 }
 
 mod json;
@@ -40,9 +101,11 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Outputs contacts to STDOUT in the given format (by default vCard)
+    /// Get a list containing the next birthday of every contact, in chronological order
+    Bdays,
+    /// Output contacts to STDOUT in the given format (by default vCard)
     Export {
-        /// Determines the format of the output (vcard/json)
+        /// The format of the output (vcard/json)
         #[arg(short = 'f', long = "fmt", default_value = "vcard")]
         format: OutputFormat,
     },
@@ -68,7 +131,7 @@ impl FromStr for OutputFormat {
 #[derive(Debug)]
 pub struct Contact {
     name: Name,
-    birthday: Option<Date>,
+    birthday: Option<PartialDate>,
     phone_numbers: Vec<PhoneNumber>,
     email_addresses: Vec<String>,
     address: Option<Address>,
@@ -80,18 +143,38 @@ struct Name {
     last: String,
 }
 
-/// Represents a date.
-///
-/// All functions and structs that take [`Date`]s assume that the date is valid. All functions that
-/// produce [`Date`]s only produce valid dates. Use [`Date::validate`] to validate dates.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct Date {
+    year: u16,
+    month: u16,
+    day: u16,
+}
+
+impl Date {
+    fn today() -> Self {
+        let today = chrono::Local::now().naive_local().date();
+        Self {
+            year: u16::try_from(today.year())
+                .expect("This program will not be executed after the year 65535"),
+            month: u16::try_from(today.month()).expect("month <= 12"),
+            day: u16::try_from(today.day()).expect("day <= 31"),
+        }
+    }
+}
+
+/// A partial date: Year, month and day are optional.
+///
+/// All functions and structs that take [`PartialDate`]s assume that the date is valid. All
+/// functions that produce [`PartialDate`]s only produce valid dates. Use [`PartialDate::validate`]
+/// to validate dates.
+#[derive(Debug)]
+struct PartialDate {
     year: Option<u16>,
     month: Option<u16>,
     day: Option<u16>,
 }
 
-impl Date {
+impl PartialDate {
     fn is_leap_year(year: u16) -> bool {
         ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0)
     }
@@ -200,6 +283,16 @@ impl Date {
                 bail!("Date cannot be represented in vCard version 4.0")
             }
         })
+    }
+}
+
+impl From<Date> for PartialDate {
+    fn from(date: Date) -> Self {
+        Self {
+            year: Some(date.year),
+            month: Some(date.month),
+            day: Some(date.day),
+        }
     }
 }
 

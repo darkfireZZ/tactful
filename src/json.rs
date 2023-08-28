@@ -4,7 +4,7 @@
 //! representation.
 
 use {
-    crate::{Address, Contact, Date, Name, PhoneNumber, PhoneNumberType},
+    crate::{Address, Contact, Name, PartialDate, PhoneNumber, PhoneNumberType},
     anyhow::Context,
     serde::{Deserialize, Serialize},
     std::io::{BufReader, Read, Write},
@@ -74,7 +74,10 @@ impl From<&Contact> for JsonContact {
     fn from(contact: &Contact) -> Self {
         Self {
             name: JsonName::from(&contact.name),
-            bday: contact.birthday.as_ref().map(Date::to_json_string_repr),
+            bday: contact
+                .birthday
+                .as_ref()
+                .map(PartialDate::to_json_string_repr),
             phone: contact
                 .phone_numbers
                 .iter()
@@ -153,7 +156,7 @@ impl TryFrom<JsonContact> for Contact {
             name: Name::from(&json_contact.name),
             birthday: json_contact
                 .bday
-                .map(|date| Date::from_json_string_repr(&date))
+                .map(|date| PartialDate::from_json_string_repr(&date))
                 .transpose()
                 .with_context(error_message)?,
             phone_numbers: json_contact
