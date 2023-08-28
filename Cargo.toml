@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+clap = { version = "4.4.0", features = ["derive"] }
 # rename `rust_iso3166` to `country_codes` to improve code readability
 # All the country codes in rust_iso3166 are crate-level constants. For example, it is not at all
 # obvious what `rust_iso3166::CH` is supposed to mean. `country_codes::CH`, however, clearly

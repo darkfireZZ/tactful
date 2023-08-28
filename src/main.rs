@@ -1,26 +1,69 @@
 use {
     anyhow::{bail, Context},
+    clap::{Parser, Subcommand},
     country_codes::CountryCode,
     std::{
         fs::File,
-        io::{BufReader, BufWriter},
+        io::{self, BufReader, BufWriter},
         str::FromStr,
     },
 };
 
 fn main() -> anyhow::Result<()> {
-    let json_path = "./contacts.json";
-    let json_file = File::open(json_path)?;
-    let contacts = json::contacts_from_json(BufReader::new(json_file))?;
+    let args = Args::parse();
 
-    let vcf_path = "./test.vcf";
-    let vcf_file = File::create(vcf_path)?;
-    let writer = BufWriter::new(vcf_file);
-    vcard::contacts_to_vcard(writer, &contacts)
+    match args.command {
+        Command::Export { format } => {
+            // TODO make contacts_path customizable
+            let json_path = "./contacts.json";
+            let json_file = File::open(json_path)?;
+            let contacts = json::contacts_from_json(BufReader::new(json_file))?;
+
+            let writer = BufWriter::new(io::stdout());
+
+            match format {
+                OutputFormat::Json => json::contacts_to_json(writer, &contacts),
+                OutputFormat::Vcard => vcard::contacts_to_vcard(writer, &contacts),
+            }
+        }
+    }
 }
 
 mod json;
 mod vcard;
+
+#[derive(Debug, Parser)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Outputs contacts to STDOUT in the given format (by default vCard)
+    Export {
+        /// Determines the format of the output (vcard/json)
+        #[arg(short = 'f', long = "fmt", default_value = "vcard")]
+        format: OutputFormat,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OutputFormat {
+    Json,
+    Vcard,
+}
+
+impl FromStr for OutputFormat {
+    type Err = anyhow::Error;
+    fn from_str(format: &str) -> anyhow::Result<Self> {
+        Ok(match format.to_ascii_lowercase().as_str() {
+            "json" => OutputFormat::Json,
+            "vcard" => OutputFormat::Vcard,
+            _ => bail!("Invalid output format"),
+        })
+    }
+}
 
 #[derive(Debug)]
 pub struct Contact {

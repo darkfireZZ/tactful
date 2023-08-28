@@ -64,7 +64,7 @@ struct JsonAddress {
 // ========================================================================== //
 
 pub fn contacts_to_json<W: Write>(writer: W, contacts: &[Contact]) -> anyhow::Result<()> {
-    Ok(serde_json::to_writer_pretty(
+    Ok(serde_json::to_writer(
         writer,
         &contacts.iter().map(JsonContact::from).collect::<Vec<_>>(),
     )?)
