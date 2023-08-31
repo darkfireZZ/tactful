@@ -14,15 +14,6 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Command::Export { format } => {
-            let contacts = obtain_contacts()?;
-            let writer = BufWriter::new(io::stdout());
-
-            match format {
-                OutputFormat::Json => json::contacts_to_json(writer, &contacts),
-                OutputFormat::Vcard => vcard::contacts_to_vcard(writer, &contacts),
-            }
-        }
         Command::Bdays => {
             let contacts = obtain_contacts()?;
             let today = Date::today();
@@ -74,6 +65,25 @@ fn main() -> anyhow::Result<()> {
 
             Ok(())
         }
+        Command::Export { format } => {
+            let contacts = obtain_contacts()?;
+            let writer = BufWriter::new(io::stdout());
+
+            match format {
+                OutputFormat::Json => json::contacts_to_json(writer, &contacts),
+                OutputFormat::Vcard => vcard::contacts_to_vcard(writer, &contacts),
+            }
+        }
+        Command::Names => {
+            let contacts = obtain_contacts()?;
+            let mut writer = BufWriter::new(io::stdout());
+
+            for contact in contacts {
+                writeln!(&mut writer, "{} {}", contact.name.first, contact.name.last)?;
+            }
+
+            Ok(())
+        }
     }
 }
 
@@ -109,6 +119,8 @@ enum Command {
         #[arg(short = 'f', long = "fmt", default_value = "vcard")]
         format: OutputFormat,
     },
+    /// Get a list of the names of all contacts
+    Names,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
