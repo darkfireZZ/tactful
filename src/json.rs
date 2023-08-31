@@ -139,7 +139,7 @@ pub fn contacts_from_json<R: Read>(reader: R) -> anyhow::Result<Vec<Contact>> {
         .into_iter()
         .map(Contact::try_from)
         .collect::<anyhow::Result<Vec<_>>>()
-        .context("Failed to parse JSON contacts")
+        .context("Failed to parse contacts store")
 }
 
 impl TryFrom<JsonContact> for Contact {

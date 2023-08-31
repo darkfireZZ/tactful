@@ -1,21 +1,29 @@
 use {
-    anyhow::{bail, Context},
+    anyhow::{anyhow, bail, Context},
     chrono::Datelike,
     clap::{Parser, Subcommand},
     country_codes::CountryCode,
     std::{
         fs::File,
         io::{self, BufReader, BufWriter, Write},
+        path::{Path, PathBuf},
         str::FromStr,
     },
 };
 
+mod json;
+mod vcard;
+mod config;
+
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
+    let config = config::obtain_config()?;
+
+    let contacts_path = args.store_path.or_else(|| config?.store_path).ok_or(anyhow!("Could not determine store path"))?;
+    let contacts = obtain_contacts(&contacts_path)?;
 
     match args.command {
         Command::Bdays => {
-            let contacts = obtain_contacts()?;
             let today = Date::today();
             let mut bday_items = contacts
                 .into_iter()
@@ -66,7 +74,6 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
         Command::Export { format } => {
-            let contacts = obtain_contacts()?;
             let writer = BufWriter::new(io::stdout());
 
             match format {
@@ -75,7 +82,6 @@ fn main() -> anyhow::Result<()> {
             }
         }
         Command::Names => {
-            let contacts = obtain_contacts()?;
             let mut writer = BufWriter::new(io::stdout());
 
             for contact in contacts {
@@ -87,11 +93,9 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn obtain_contacts() -> anyhow::Result<Vec<Contact>> {
-    // TODO make contacts_path customizable
-    let contacts_path = "./contacts.json";
-    let contacts_file = File::open(contacts_path)?;
-    json::contacts_from_json(BufReader::new(contacts_file))
+fn obtain_contacts(store_path: &Path) -> anyhow::Result<Vec<Contact>> {
+    let contacts_store = File::open(store_path).context("Failed to open contacts store")?;
+    json::contacts_from_json(BufReader::new(contacts_store))
 }
 
 #[derive(Debug)]
@@ -100,13 +104,12 @@ struct BdayItem {
     contact: Contact,
 }
 
-mod json;
-mod vcard;
-
 #[derive(Debug, Parser)]
 struct Args {
     #[command(subcommand)]
     command: Command,
+    #[arg(short = 's', long = "store")]
+    store_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]

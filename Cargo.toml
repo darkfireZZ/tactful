@@ -15,3 +15,4 @@ country_codes = { version = "0.1.10", package = "rust_iso3166" }
 ical_vcard = "0.2.0"
 serde = { version = "1.0.186", features = ["derive"] }
 serde_json = "1.0.105"
+toml = "0.7.6"
