@@ -11,3 +11,8 @@ own purposes.
 ## Documentation
 
 At this moment there exists no documentation except the source code.
+
+## License
+
+This project is licensed under either the [MIT License](./LICENSE-MIT) or
+[version 2.0 of the Apache License](./LICENSE-APACHE) at your option.
