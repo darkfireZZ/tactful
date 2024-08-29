@@ -13,13 +13,13 @@ use {
 
 mod json;
 mod vcard;
-mod config;
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let config = config::obtain_config()?;
 
-    let contacts_path = args.store_path.or_else(|| config?.store_path).ok_or(anyhow!("Could not determine store path"))?;
+    let contacts_path = args
+        .store_path
+        .ok_or(anyhow!("Could not determine store path"))?;
     let contacts = obtain_contacts(&contacts_path)?;
 
     match args.command {
