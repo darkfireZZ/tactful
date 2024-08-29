@@ -1,32 +1,32 @@
 use {
-    anyhow::{anyhow, bail, Context},
+    crate::args::{Args, Command, OutputFormat},
+    anyhow::{bail, Context},
     chrono::Datelike,
-    clap::{Parser, Subcommand},
+    clap::Parser,
     country_codes::CountryCode,
     std::{
-        fs::File,
-        io::{self, BufReader, BufWriter, Write},
-        path::{Path, PathBuf},
+        io::{self, BufWriter, Write},
         str::FromStr,
     },
+    store::ContactStore,
 };
 
+mod args;
 mod json;
+mod store;
 mod vcard;
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let contacts_path = args
-        .store_path
-        .ok_or(anyhow!("Could not determine store path"))?;
-    let contacts = obtain_contacts(&contacts_path)?;
+    let store_path = args.store_path()?;
+    let store = ContactStore::from_path(store_path)?;
 
-    match args.command {
+    match args.command() {
         Command::Bdays => {
             let today = Date::today();
-            let mut bday_items = contacts
-                .into_iter()
+            let mut bday_items = store
+                .contacts()
                 .filter_map(|contact| {
                     let bday = contact.birthday.as_ref()?;
                     // Note that if bday is on the 29th February, `next_bday` may NOT represent a valid
@@ -53,7 +53,10 @@ fn main() -> anyhow::Result<()> {
                         _ => return None,
                     };
 
-                    Some(BdayItem { next_bday, contact })
+                    Some(BdayItem {
+                        next_bday,
+                        contact: contact.clone(),
+                    })
                 })
                 .collect::<Vec<_>>();
             bday_items.sort_unstable_by_key(|item| item.next_bday);
@@ -77,14 +80,14 @@ fn main() -> anyhow::Result<()> {
             let writer = BufWriter::new(io::stdout());
 
             match format {
-                OutputFormat::Json => json::contacts_to_json(writer, &contacts),
-                OutputFormat::Vcard => vcard::contacts_to_vcard(writer, &contacts),
+                OutputFormat::Json => json::contacts_to_json(writer, store.contacts()),
+                OutputFormat::Vcard => vcard::contacts_to_vcard(writer, store.contacts()),
             }
         }
         Command::Names => {
             let mut writer = BufWriter::new(io::stdout());
 
-            for contact in contacts {
+            for contact in store.contacts() {
                 writeln!(&mut writer, "{} {}", contact.name.first, contact.name.last)?;
             }
 
@@ -93,57 +96,13 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn obtain_contacts(store_path: &Path) -> anyhow::Result<Vec<Contact>> {
-    let contacts_store = File::open(store_path).context("Failed to open contacts store")?;
-    json::contacts_from_json(BufReader::new(contacts_store))
-}
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct BdayItem {
     next_bday: Date,
     contact: Contact,
 }
 
-#[derive(Debug, Parser)]
-struct Args {
-    #[command(subcommand)]
-    command: Command,
-    #[arg(short = 's', long = "store")]
-    store_path: Option<PathBuf>,
-}
-
-#[derive(Debug, Subcommand)]
-enum Command {
-    /// Get a list containing the next birthday of every contact, in chronological order
-    Bdays,
-    /// Output contacts to STDOUT in the given format (by default vCard)
-    Export {
-        /// The format of the output (vcard/json)
-        #[arg(short = 'f', long = "fmt", default_value = "vcard")]
-        format: OutputFormat,
-    },
-    /// Get a list of the names of all contacts
-    Names,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum OutputFormat {
-    Json,
-    Vcard,
-}
-
-impl FromStr for OutputFormat {
-    type Err = anyhow::Error;
-    fn from_str(format: &str) -> anyhow::Result<Self> {
-        Ok(match format.to_ascii_lowercase().as_str() {
-            "json" => OutputFormat::Json,
-            "vcard" => OutputFormat::Vcard,
-            _ => bail!("Invalid output format"),
-        })
-    }
-}
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Contact {
     name: Name,
     birthday: Option<PartialDate>,
@@ -152,7 +111,7 @@ pub struct Contact {
     address: Option<Address>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Name {
     first: String,
     last: String,
@@ -182,7 +141,7 @@ impl Date {
 /// All functions and structs that take [`PartialDate`]s assume that the date is valid. All
 /// functions that produce [`PartialDate`]s only produce valid dates. Use [`PartialDate::validate`]
 /// to validate dates.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct PartialDate {
     year: Option<u16>,
     month: Option<u16>,
@@ -316,7 +275,7 @@ impl From<Date> for PartialDate {
 /// All functions and structs that take [`PhoneNumber`]s assume that the phone number is valid. All
 /// functions that produce [`PhoneNumber`]s only produce valid phone numbers. Use
 /// [`PhoneNumber::validate`] to validate phone numbers.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct PhoneNumber {
     number: String,
     ty: PhoneNumberType,
@@ -359,7 +318,7 @@ enum PhoneNumberType {
     Work,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Address {
     street: String,
     number: String,

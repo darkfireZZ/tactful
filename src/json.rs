@@ -63,10 +63,13 @@ struct JsonAddress {
 // =====> serialization <==================================================== //
 // ========================================================================== //
 
-pub fn contacts_to_json<W: Write>(writer: W, contacts: &[Contact]) -> anyhow::Result<()> {
+pub fn contacts_to_json<'a, C: Iterator<Item = &'a Contact>, W: Write>(
+    writer: W,
+    contacts: C,
+) -> anyhow::Result<()> {
     Ok(serde_json::to_writer(
         writer,
-        &contacts.iter().map(JsonContact::from).collect::<Vec<_>>(),
+        &contacts.map(JsonContact::from).collect::<Vec<_>>(),
     )?)
 }
 
