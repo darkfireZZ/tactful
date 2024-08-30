@@ -20,7 +20,13 @@ impl Args {
     pub fn store_path(&self) -> anyhow::Result<PathBuf> {
         self.store_path
             .clone()
-            .or_else(|| env::var("HOME").ok().map(PathBuf::from))
+            .or_else(|| {
+                env::var("HOME").ok().map(|home_dir| {
+                    let mut path = PathBuf::from(home_dir);
+                    path.push(".contact-store");
+                    path
+                })
+            })
             .ok_or_else(|| anyhow!("Could not find contact store"))
     }
 }
