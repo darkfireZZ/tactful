@@ -8,6 +8,14 @@ file and changes to it need to be applied manually in the JSON file.
 This project is primarily intended for personal use, but you are of course free to use it for your
 own purposes.
 
+## Installation
+
+`tactful` can be installed using cargo.
+
+```sh
+cargo install --git https://github.com/darkfirezz/tactful
+```
+
 ## Documentation
 
 At this moment there exists no documentation except the source code.
