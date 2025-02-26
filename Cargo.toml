@@ -12,6 +12,7 @@ clap = { version = "4.5.16", features = ["derive"] }
 # obvious what `rust_iso3166::CH` is supposed to mean. `country_codes::CH`, however, clearly
 # indicates that "CH" is a country code.
 country_codes = { version = "0.1.13", package = "rust_iso3166" }
+ical = { git = "https://github.com/darkfirezz/ical", version = "0.1.0" }
 ical_vcard = "0.2.0"
 serde = { version = "1.0.209", features = ["derive"] }
 serde_json = "1.0.127"

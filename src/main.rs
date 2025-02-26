@@ -1,9 +1,10 @@
 use {
     crate::args::{Args, Command, OutputFormat},
     anyhow::{bail, Context},
-    chrono::Datelike,
+    chrono::{Datelike, Timelike},
     clap::Parser,
     country_codes::CountryCode,
+    ical::{Calendar, Event, RecurrenceFrequency, RecurrenceRule, StartDateTime},
     std::{
         io::{self, BufWriter, Write},
         str::FromStr,
@@ -74,6 +75,64 @@ fn main() -> anyhow::Result<()> {
                 )?;
             }
 
+            Ok(())
+        }
+        Command::BdaysCalendar => {
+            let mut calendar = Calendar::new();
+            calendar.set_product_identifier(concat!(
+                "nicolabruhin.com ",
+                env!("CARGO_PKG_NAME"),
+                " ",
+                env!("CARGO_PKG_VERSION")
+            ));
+            for contact in store.contacts() {
+                let Some(bday) = &contact.birthday else {
+                    continue;
+                };
+                let (Some(month), Some(day)) = (bday.month, bday.day) else {
+                    continue;
+                };
+                let month = month as u8;
+                let day = day as u8;
+                let now = chrono::Local::now();
+                let now_ical = ical::DateTime {
+                    date: ical::Date::new(now.year() as u16, now.month() as u8, now.day() as u8),
+                    time: ical::Time::new_utc(
+                        now.hour() as u8,
+                        now.minute() as u8,
+                        now.second() as u8,
+                    ),
+                };
+                if let Some(year) = bday.year {
+                    // If we know the year of birth, we can add the age to the summary.
+                    let mut date = ical::Date::new(year, month, day);
+                    // People usually don't live longer than 150 years.
+                    for age in 0..150 {
+                        let mut event = Event::new(StartDateTime::from(date), now_ical);
+                        event.set_summary(format!(
+                            "{} {} ({age})",
+                            contact.name.first, contact.name.last
+                        ));
+                        calendar.add_component(event);
+                        date.set_year(date.year() + 1);
+                        // Not adding events after 10 years in the future saves space.
+                        if date.year() > now_ical.date.year() + 10 {
+                            break;
+                        }
+                    }
+                } else {
+                    // If we don't know the year of birth, we simply add a recurring event starting
+                    // from the previous year.
+                    let start_date =
+                        StartDateTime::from(ical::Date::new(now_ical.date.year() - 1, month, day));
+                    let mut event = Event::new(start_date, now_ical);
+                    event.set_summary(format!("{} {}", contact.name.first, contact.name.last));
+                    event.set_recurrence_rule(RecurrenceRule::new(RecurrenceFrequency::Yearly));
+                    calendar.add_component(event);
+                }
+            }
+            let writer = BufWriter::new(io::stdout());
+            calendar.write(writer).context("Failed to write calendar")?;
             Ok(())
         }
         Command::Export { format } => {

@@ -35,6 +35,8 @@ impl Args {
 pub enum Command {
     /// Get a list containing the next birthday of every contact, in chronological order
     Bdays,
+    /// Create an iCalendar file containing the future birthdays of all contacts
+    BdaysCalendar,
     /// Output contacts to STDOUT in the given format (by default vCard)
     Export {
         /// The format of the output (vcard/json)
